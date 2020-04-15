@@ -282,9 +282,11 @@ class Node:
 
 	def parse_message(self):
 		while(not stop):
+			print(1)
 			if(self.queue.qsize() == 0):
 				continue
-			msg = self.queue.get()
+			with self.lock:
+				msg = self.queue.get()
 			if(msg[0] == awake):
 				self.initialize()
 			elif(msg[0] == connect):
@@ -368,9 +370,16 @@ if __name__ == "__main__":
 	# for node in nodes:
 	nodes[0].get_msg((awake,))
 
-	while(stop == 0):
-		for node in nodes:
-			node.parse_message_seq()
+	threads = [Thread(target=start_node, args=(nodes[i], )) for i in range(num_node)]
+	for thread in threads:
+		thread.start()
+
+	for thread in threads:
+		thread.join()
+
+	# while(stop == 0):
+	# 	for node in nodes:
+	# 		node.parse_message_seq()
 		# input()
 
 	output = set()
