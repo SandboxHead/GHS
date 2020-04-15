@@ -3,7 +3,7 @@ import math
 import sys
 from operator import itemgetter, attrgetter
 from threading import Thread, RLock
-
+import logging
 # Node states
 sleep = 0
 find = 1
@@ -282,7 +282,7 @@ class Node:
 
 	def parse_message(self):
 		while(not stop):
-			print(1)
+			logging.exception(1)
 			if(self.queue.qsize() == 0):
 				continue
 			with self.lock:
@@ -354,8 +354,11 @@ def read_file(filename):
 def start_node(node):
 	node.parse_message()
 
-if __name__ == "__main__":
-	filename = sys.argv[1]
+
+
+def manage(inpfile, outfile):
+	global stop
+	filename = inpfile
 	num_node, edges = read_file(filename)
 	nodes = [Node(i, i) for i in range(num_node)]
 	for x in edges:
@@ -366,8 +369,6 @@ if __name__ == "__main__":
 		for node in nodes:
 			print(node)
 
-
-	# for node in nodes:
 	nodes[0].get_msg((awake,))
 
 	threads = [Thread(target=start_node, args=(nodes[i], )) for i in range(num_node)]
@@ -376,11 +377,6 @@ if __name__ == "__main__":
 
 	for thread in threads:
 		thread.join()
-
-	# while(stop == 0):
-	# 	for node in nodes:
-	# 		node.parse_message_seq()
-		# input()
 
 	output = set()
 	for node in nodes:
@@ -391,6 +387,49 @@ if __name__ == "__main__":
 
 	output = list(output)
 	output = sorted(output, key=itemgetter(2))
-	for edge in output:
-		print(edge)
+	with open(outfile, 'w') as f:
+		for edge in output:
+			f.write(str(edge))
+	stop = 0
+
+# if __name__ == "__main__":
+# 	filename = sys.argv[1]
+# 	num_node, edges = read_file(filename)
+# 	nodes = [Node(i, i) for i in range(num_node)]
+# 	for x in edges:
+# 		nodes[x[0]].add_edge(nodes[x[1]], x[2])
+# 		nodes[x[1]].add_edge(nodes[x[0]], x[2])
+
+# 	if(debug):
+# 		for node in nodes:
+# 			print(node)
+
+
+# 	# for node in nodes:
+# 	nodes[0].get_msg((awake,))
+
+# 	threads = [Thread(target=start_node, args=(nodes[i], )) for i in range(num_node)]
+# 	for thread in threads:
+# 		thread.start()
+
+# 	for thread in threads:
+# 		thread.join()
+
+# 	# while(stop == 0):
+# 	# 	for node in nodes:
+# 	# 		node.parse_message_seq()
+# 		# input()
+
+# 	output = set()
+# 	for node in nodes:
+# 		for key in node.edges:
+# 			edge = node.edges[key]
+# 			if(edge.state == branch):
+# 				output.add((min(node.nodeid, edge.v.nodeid), max(node.nodeid, edge.v.nodeid), edge.weight))
+
+# 	output = list(output)
+# 	output = sorted(output, key=itemgetter(2))
+# 	# with open(outfile, 'w') as f:
+# 	for edge in output:
+# 		print(edge)
 	

@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 from prims import prims
-from scripts import manage
+from ghs import manage
 
 def big_test(n):
 	a = np.random.choice(np.arange(0, 2*n*n), replace=False, size=(n, n))
@@ -37,6 +37,7 @@ def parse(fname):
 
 	l1 = []
 	for i in d:
+		print(i)
 		l1.append(int(i.strip()[1:-1][-1]))
 	return l1.sort()
 
@@ -62,8 +63,7 @@ if __name__ == '__main__':
 		#
 		# this should write all MST edges in a file named
 		# "outfile" in sorted order of weights (asc)
-		manage.run_algorithm("inpfile", "outfile")
-		
+		manage("inpfile", "outfile")
 
 		flag = (check("outfile", "primfile"))
 		if not flag:
