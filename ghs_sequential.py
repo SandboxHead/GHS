@@ -2,7 +2,7 @@ from queue import Queue
 import math 
 import sys
 from operator import itemgetter, attrgetter
-from threading import Thread, RLock
+import threading
 
 # Node states
 sleep = 0
@@ -63,7 +63,6 @@ class Node:
 		self.edges = {}
 		self.stop = 0
 		self.done = False
-		self.lock = RLock()
 
 	def __str__(self):
 		output = ''
@@ -76,10 +75,6 @@ class Node:
 			output += '{} {}\n'.format(self.edges[key].v.nodeid, self.edges[key].weight)
 		output += "\n"
 		return output
-
-	def get_msg(self, message):
-		with self.lock:
-			self.queue.put(message)
 
 	def add_edge(self, neighbour, weight):
 		self.edges[neighbour.nodeid] = Edge(neighbour, weight)
@@ -94,7 +89,7 @@ class Node:
 		self.rec = 0
 		if(debug):
 			print('PUSH', self.nodeid, edge.v.nodeid, 'Connect', self.level, self.nodeid)
-		edge.v.get_msg((connect, 0, self.nodeid))
+		edge.v.queue.put((connect, 0, self.nodeid))
 
 	def process_connect(self, level, nodeid):
 		if(self.state == sleep):
@@ -104,17 +99,16 @@ class Node:
 			edge.state = branch
 			if(debug):
 				print('PUSH', self.nodeid, edge.v.nodeid, 'Initiate', self.level, self.name, self.state, self.nodeid)
-			edge.v.get_msg((initiate, self.level,self.name, self.state, self.nodeid))
+			edge.v.queue.put((initiate, self.level,self.name, self.state, self.nodeid))
 		elif edge.state == basic:
-			# Wait. How to do it?
 			if(debug):
 				print('PUSH', self.nodeid, self.nodeid, 'Connect', level, nodeid)
-			self.get_msg((connect, level, nodeid))
+			self.queue.put((connect, level, nodeid))
 
 		else:
 			if(debug):
 				print('PUSH', self.nodeid, edge.v.nodeid, 'Initiate', self.level+1, edge.weight, self.state, self.nodeid)
-			edge.v.get_msg((initiate, self.level+1, edge.weight, find, self.nodeid))
+			edge.v.queue.put((initiate, self.level+1, edge.weight, find, self.nodeid))
 
 	def process_initiate(self, level, name, state, nodeid):
 		if(self.state == sleep):
@@ -133,7 +127,7 @@ class Node:
 			if (edge.state == branch) and (key != nodeid):
 				if(debug):
 					print('PUSH', self.nodeid, edge.v.nodeid, 'Initiate', level, name, state, self.nodeid)
-				edge.v.get_msg((initiate, level, name, state, self.nodeid))
+				edge.v.queue.put((initiate, level, name, state, self.nodeid))
 
 		if self.state == find:
 			self.rec = 0
@@ -160,7 +154,7 @@ class Node:
 			self.testNode = minedge.v.nodeid
 			if(debug):
 				print('PUSH', self.nodeid, minedge.v.nodeid, 'Test', self.level, self.name, self.nodeid)
-			minedge.v.get_msg((test, self.level, self.name, self.nodeid))
+			minedge.v.queue.put((test, self.level, self.name, self.nodeid))
 		else:
 			self.testNode = None
 			self.report()
@@ -173,7 +167,7 @@ class Node:
 			if(debug):
 				# print("Level: ", self.level)
 				print('PUSH', self.nodeid, self.nodeid, 'Test', level, name,nodeid)
-			self.get_msg((test, level, name, nodeid))
+			self.queue.put((test, level, name, nodeid))
 
 		elif(self.name == name):
 			if edge.state == basic:
@@ -182,14 +176,14 @@ class Node:
 			if nodeid != self.testNode:
 				if(debug):
 					print('PUSH', self.nodeid, edge.v.nodeid, 'Reject', self.nodeid)
-				edge.v.get_msg((reject, self.nodeid))
+				edge.v.queue.put((reject, self.nodeid))
 			else:
 				self.find_min()
 
 		else:
 			if(debug):
 				print('PUSH', self.nodeid, edge.v.nodeid, 'Accept', self.nodeid)
-			edge.v.get_msg((accept, self.nodeid))
+			edge.v.queue.put((accept, self.nodeid))
 
 	def process_accept(self, nodeid):
 		if(self.state == sleep):
@@ -225,7 +219,7 @@ class Node:
 			self.state = found
 			if(debug):
 				print('PUSH', self.nodeid, self.edges[self.parent].v.nodeid, 'Report', self.bestWt, self.nodeid)
-			self.edges[self.parent].v.get_msg((report, self.bestWt, self.nodeid))
+			self.edges[self.parent].v.queue.put((report, self.bestWt, self.nodeid))
 
 
 		# for key in self.edges:
@@ -234,7 +228,7 @@ class Node:
 		# 		self.state = found
 		# 		if(debug):
 		# 			print('PUSH', self.nodeid, self.edges[self.parent].v.nodeid, 'Report', self.bestWt, self.nodeid)
-		# 		self.edges[self.parent].v.get_msg((report, self.bestWt, self.nodeid))
+		# 		self.edges[self.parent].v.queue.put((report, self.bestWt, self.nodeid))
 
 
 	def process_report(self, wt, nodeid):
@@ -253,7 +247,7 @@ class Node:
 			if self.state == find:
 				if(debug):
 					print('PUSH', self.nodeid, self.nodeid, 'Report', wt,nodeid)
-				self.get_msg((report, wt, nodeid))
+				self.queue.put((report, wt, nodeid))
 			elif wt > self.bestWt:
 				self.change_root()
 			elif wt == math.inf and self.bestWt	 == math.inf:
@@ -267,12 +261,12 @@ class Node:
 		if edge.state == branch:
 			if(debug):
 				print('PUSH', self.nodeid, edge.v.nodeid, 'Changeroot', self.nodeid)
-			edge.v.get_msg((changeroot, self.nodeid))
+			edge.v.queue.put((changeroot, self.nodeid))
 		else:
 			edge.state = branch
 			if(debug):
 				print('PUSH', self.nodeid, edge.v.nodeid, 'Connect', self.level, self.nodeid)
-			edge.v.get_msg((connect, self.level, self.nodeid))
+			edge.v.queue.put((connect, self.level, self.nodeid))
 
 
 	def process_changeroot(self, nodeid):
@@ -364,10 +358,9 @@ if __name__ == "__main__":
 		for node in nodes:
 			print(node)
 
-
 	# for node in nodes:
-	nodes[0].get_msg((awake,))
-
+	nodes[0].queue.put((awake,))
+	done = True
 	while(stop == 0):
 		for node in nodes:
 			node.parse_message_seq()
